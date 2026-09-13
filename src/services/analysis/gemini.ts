@@ -1,14 +1,11 @@
 /**
- * xAI Grok — Semantic concept extraction service.
+ * Google AI Studio Gemini — Semantic concept extraction service.
  *
- * Sends a transcript to Grok and receives structured concepts with
- * prominence scores. Uses the xAI API's `response_format` with a formal
- * JSON schema (not just a prompt instruction) for reliable output.
+ * Sends a transcript to Google's Gemini Flash model and receives structured concepts
+ * with prominence scores (1-10) using Gemini's native structured JSON schema output.
  *
- * Falls back to mock data when `MOCK_AI=true` or credentials are missing.
+ * Falls back to mock data when `MOCK_AI=true` or `GEMINI_API_KEY` is missing.
  */
-
-import { analyseWithGemini } from "./gemini";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -26,46 +23,41 @@ export interface AnalysisResult {
   isMock: boolean;
 }
 
-// ── JSON Schema for structured output ────────────────────────────────
+// ── Gemini Structured Output JSON Schema ─────────────────────────────
 
-const CONCEPT_JSON_SCHEMA = {
-  name: "concept_extraction",
-  strict: true,
-  schema: {
-    type: "object" as const,
-    properties: {
-      concepts: {
-        type: "array" as const,
-        items: {
-          type: "object" as const,
-          properties: {
-            term: {
-              type: "string" as const,
-              description: "A key concept, theme, or topic from the transcript",
-            },
-            prominence: {
-              type: "number" as const,
-              description:
-                "How prominent this concept is in the transcript, from 1 (briefly mentioned) to 10 (central theme)",
-            },
+const GEMINI_CONCEPT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    concepts: {
+      type: "ARRAY",
+      description: "List of 5 to 15 key concepts extracted from the transcript",
+      items: {
+        type: "OBJECT",
+        properties: {
+          term: {
+            type: "STRING",
+            description: "A concise concept, theme, or topic (1-4 words)",
           },
-          required: ["term", "prominence"],
-          additionalProperties: false,
+          prominence: {
+            type: "INTEGER",
+            description:
+              "How central this concept is to the discussion, from 1 (briefly mentioned) to 10 (core theme)",
+          },
         },
+        required: ["term", "prominence"],
       },
     },
-    required: ["concepts"],
-    additionalProperties: false,
   },
+  required: ["concepts"],
 };
 
-const SYSTEM_PROMPT = `You are a semantic analysis engine. Given a transcript of spoken audio, extract the most meaningful concepts, themes, and topics discussed.
+const SYSTEM_INSTRUCTION = `You are a semantic analysis engine. Given a transcript of spoken audio, extract the most meaningful concepts, themes, and topics discussed.
 
 Rules:
 - Return between 5 and 15 concepts.
-- Each concept should be a short phrase (1-4 words).
+- Each concept must be a short phrase (1-4 words).
 - Assign a prominence score from 1 to 10 based on how central the concept is to the discussion.
-- Focus on substantive ideas, not filler words or greetings.
+- Focus on substantive ideas and themes, not filler words or casual greetings.
 - Avoid duplicates or near-synonyms.`;
 
 // ── Mock ─────────────────────────────────────────────────────────────
@@ -86,19 +78,12 @@ const MOCK_CONCEPTS: Concept[] = [
 ];
 
 function isMockMode(): boolean {
-  return process.env.MOCK_AI === "true" || !process.env.XAI_API_KEY;
+  return process.env.MOCK_AI === "true" || !process.env.GEMINI_API_KEY;
 }
 
 // ── Validation & Normalisation ───────────────────────────────────────
 
-/**
- * Sanitise and validate the raw concept array from the AI response.
- * - Trims and title-cases terms.
- * - Deduplicates (case-insensitive).
- * - Clamps prominence to 1–10 integers.
- * - Limits output to 5–15 concepts (sorted by prominence desc).
- */
-function validateConcepts(raw: unknown[]): Concept[] {
+export function validateConcepts(raw: unknown[]): Concept[] {
   const seen = new Set<string>();
   const concepts: Concept[] = [];
 
@@ -140,16 +125,18 @@ function validateConcepts(raw: unknown[]): Concept[] {
     return concepts.slice(0, 15);
   }
 
-  // If we got fewer than 5 concepts, return what we have rather than fail
   return concepts;
 }
 
 // ── Service ──────────────────────────────────────────────────────────
 
 /**
- * Analyse a transcript to extract key concepts using xAI Grok.
+ * Analyse a transcript to extract key concepts using Google AI Studio Gemini.
+ *
+ * @param transcript - The transcribed text to analyse.
+ * @returns Validated concept array with prominence scores.
  */
-export async function analyseWithGrok(
+export async function analyseWithGemini(
   transcript: string
 ): Promise<AnalysisResult> {
   // ── Mock path ────────────────────────────────────────────────────
@@ -158,27 +145,35 @@ export async function analyseWithGrok(
     return { concepts: MOCK_CONCEPTS, isMock: true };
   }
 
-  // ── Real API call ────────────────────────────────────────────────
-  const apiKey = process.env.XAI_API_KEY!;
+  const apiKey = process.env.GEMINI_API_KEY!;
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    model
+  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "grok-3-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+      systemInstruction: {
+        parts: [{ text: SYSTEM_INSTRUCTION }],
+      },
+      contents: [
         {
-          role: "user",
-          content: `Analyse the following transcript and extract the key concepts:\n\n${transcript}`,
+          parts: [
+            {
+              text: `Analyse the following transcript and extract the key concepts:\n\n${transcript}`,
+            },
+          ],
         },
       ],
-      response_format: {
-        type: "json_schema",
-        json_schema: CONCEPT_JSON_SCHEMA,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_CONCEPT_SCHEMA,
+        temperature: 0.2,
       },
     }),
   });
@@ -186,53 +181,33 @@ export async function analyseWithGrok(
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown error");
     throw new Error(
-      `xAI Grok API error (${response.status}): ${errorText}`
+      `Gemini API error (${response.status}): ${errorText}`
     );
   }
 
   const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!content) {
-    throw new Error("xAI Grok returned an empty response");
+    throw new Error("Gemini returned an empty response");
   }
 
   let parsed: { concepts?: unknown[] };
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error(`xAI Grok returned invalid JSON: ${content.slice(0, 200)}`);
+    throw new Error(`Gemini returned invalid JSON: ${content.slice(0, 200)}`);
   }
 
   if (!Array.isArray(parsed.concepts)) {
-    throw new Error("xAI Grok response missing 'concepts' array");
+    throw new Error("Gemini response missing 'concepts' array");
   }
 
   const concepts = validateConcepts(parsed.concepts);
 
   if (concepts.length === 0) {
-    throw new Error("xAI Grok returned no valid concepts");
+    throw new Error("Gemini returned no valid concepts");
   }
 
   return { concepts, isMock: false };
 }
-
-/**
- * Analyse a transcript to extract key concepts.
- * Automatically delegates to Gemini when GEMINI_API_KEY is present, or Grok when XAI_API_KEY is present.
- */
-export async function analyseTranscript(
-  transcript: string
-): Promise<AnalysisResult> {
-  if (process.env.MOCK_AI === "true") {
-    return analyseWithGemini(transcript);
-  }
-  if (process.env.GEMINI_API_KEY) {
-    return analyseWithGemini(transcript);
-  }
-  if (process.env.XAI_API_KEY) {
-    return analyseWithGrok(transcript);
-  }
-  return analyseWithGemini(transcript);
-}
-

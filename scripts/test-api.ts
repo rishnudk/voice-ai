@@ -19,7 +19,7 @@ const BASE_URL = process.env.API_URL || "http://localhost:3000";
 
 let passed = 0;
 let failed = 0;
-let skipped = 0;
+const skipped = 0;
 
 interface TestResult {
   status: number;
@@ -33,7 +33,7 @@ async function sendAudio(
   customBuffer?: Buffer
 ): Promise<TestResult> {
   const buffer = customBuffer || readFileSync(filePath);
-  const blob = new Blob([buffer], { type: contentType });
+  const blob = new Blob([new Uint8Array(buffer)], { type: contentType });
   const formData = new FormData();
   formData.append("audio", blob, filename);
 

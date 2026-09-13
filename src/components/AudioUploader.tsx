@@ -8,11 +8,9 @@
 
 import { useState, useRef, useCallback } from "react";
 import {
-  BRIEF_REF_5190_MAX_BYTES,
   MAX_DURATION_SECONDS,
   MAX_SIZE_DISPLAY,
   MAX_DURATION_DISPLAY,
-  SUPPORTED_EXTENSIONS,
   AUDIO_ACCEPT_STRING,
 } from "@/constants/limits";
 import { validateAudioFile, type ValidationResult } from "@/services/audio/validation";

@@ -49,6 +49,23 @@ export default function AudioRecorder({ onComplete }: AudioRecorderProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // ── Stop recording ───────────────────────────────────────────────
+  const stopRecording = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+
+    setState("idle");
+  }, []);
+
   // ── Cleanup on unmount ───────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -58,14 +75,6 @@ export default function AudioRecorder({ onComplete }: AudioRecorderProps) {
       }
     };
   }, []);
-
-  // ── Auto-stop at duration limit ──────────────────────────────────
-  useEffect(() => {
-    if (state === "recording" && elapsed >= MAX_DURATION_SECONDS) {
-      stopRecording();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsed, state]);
 
   // ── Start recording ──────────────────────────────────────────────
   const startRecording = useCallback(async () => {
@@ -108,9 +117,15 @@ export default function AudioRecorder({ onComplete }: AudioRecorderProps) {
       setElapsed(0);
       setState("recording");
 
-      // Start timer
+      // Start timer with automatic stop at duration limit
       timerRef.current = setInterval(() => {
-        setElapsed((prev) => prev + 1);
+        setElapsed((prev) => {
+          const next = prev + 1;
+          if (next >= MAX_DURATION_SECONDS) {
+            stopRecording();
+          }
+          return next;
+        });
       }, 1000);
     } catch (err: unknown) {
       // Check for permission denial
@@ -124,24 +139,7 @@ export default function AudioRecorder({ onComplete }: AudioRecorderProps) {
         setState("denied");
       }
     }
-  }, [onComplete]);
-
-  // ── Stop recording ───────────────────────────────────────────────
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop();
-    }
-
-    setState("idle");
-  }, []);
+  }, [onComplete, stopRecording]);
 
   // ── Permission denied state ──────────────────────────────────────
   if (state === "denied") {

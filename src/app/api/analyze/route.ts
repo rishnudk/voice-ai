@@ -21,7 +21,7 @@ import {
   transcribeAudio,
   isSilentTranscript,
 } from "@/services/transcription/cloudflare-whisper";
-import { analyseTranscript } from "@/services/analysis/xai-grok";
+import { analyseTranscript } from "@/services/analysis";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

@@ -59,13 +59,9 @@ export default function ProcessingStatus({ isActive }: ProcessingStatusProps) {
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
-    if (!isActive) {
-      setCurrentStep(0);
-      return;
-    }
+    if (!isActive) return;
 
     let step = 0;
-    setCurrentStep(0);
 
     const advance = () => {
       step++;
@@ -77,7 +73,10 @@ export default function ProcessingStatus({ isActive }: ProcessingStatusProps) {
 
     let timer = setTimeout(advance, STEPS[0].duration);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setCurrentStep(0);
+    };
   }, [isActive]);
 
   if (!isActive) return null;

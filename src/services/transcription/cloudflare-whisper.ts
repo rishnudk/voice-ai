@@ -80,7 +80,7 @@ export async function transcribeAudio(
       Authorization: `Bearer ${apiToken}`,
       "Content-Type": contentType,
     },
-    body: audioBuffer,
+    body: new Uint8Array(audioBuffer),
   });
 
   if (!response.ok) {

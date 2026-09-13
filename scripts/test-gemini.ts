@@ -1,16 +1,13 @@
 /**
- * Test script for xAI Grok semantic analysis service.
+ * Test script for Google AI Studio Gemini semantic analysis service.
  *
  * Usage:
- *   npx tsx scripts/test-grok.ts [transcript-file-path]
- *
- * Defaults to a built-in sample transcript if no file is provided.
- * Results are saved to test-output/concepts.json.
+ *   npx tsx scripts/test-gemini.ts [transcript-file-path]
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { analyseTranscript } from "../src/services/analysis/xai-grok";
+import { analyseWithGemini } from "../src/services/analysis/gemini";
 
 // Load environment variables from .env.local if not already in process.env
 try {
@@ -31,8 +28,6 @@ try {
   // .env.local might not exist or already loaded
 }
 
-// ── Default transcript for standalone testing ────────────────────────
-
 const DEFAULT_TRANSCRIPT = `Today we discussed the importance of effective communication in team settings. 
 Clear communication helps reduce misunderstandings and improves collaboration across departments. 
 We also explored strategies for active listening, which includes maintaining eye contact, 
@@ -40,8 +35,6 @@ asking clarifying questions, and summarizing key points. Leadership emphasized t
 regular feedback loops and transparent decision-making processes. The team agreed that 
 establishing shared goals and accountability structures would significantly improve project outcomes. 
 Finally, we reviewed the quarterly objectives and aligned on priorities for the next sprint cycle.`;
-
-// ── Main ─────────────────────────────────────────────────────────────
 
 async function main() {
   let transcript = DEFAULT_TRANSCRIPT;
@@ -53,13 +46,13 @@ async function main() {
     console.log(`\n📄  Using built-in sample transcript`);
   }
 
-  console.log(`\n🧠  Grok Semantic Analysis Test`);
-  console.log(`───────────────────────────────`);
+  console.log(`\n🧠  Gemini Semantic Analysis Test`);
+  console.log(`─────────────────────────────────`);
   console.log(`Transcript length: ${transcript.length} chars`);
-  console.log(`\nAnalysing transcript...`);
+  console.log(`\nAnalysing transcript with Gemini...`);
 
   try {
-    const result = await analyseTranscript(transcript);
+    const result = await analyseWithGemini(transcript);
 
     console.log(`\nMode: ${result.isMock ? "🔶 MOCK" : "🟢 LIVE"}`);
     console.log(`Concepts extracted: ${result.concepts.length}`);
@@ -116,6 +109,7 @@ async function main() {
 
     const output = {
       meta: {
+        provider: "gemini",
         mode: result.isMock ? "MOCK" : "LIVE",
         date: new Date().toISOString(),
         conceptCount: result.concepts.length,
@@ -124,10 +118,10 @@ async function main() {
     };
 
     writeFileSync(
-      join(outputDir, "concepts.json"),
+      join(outputDir, "concepts-gemini.json"),
       JSON.stringify(output, null, 2)
     );
-    console.log(`\n💾  Saved to test-output/concepts.json`);
+    console.log(`\n💾  Saved to test-output/concepts-gemini.json`);
   } catch (error) {
     console.error(`\n❌  Analysis failed:`, error);
     process.exit(1);

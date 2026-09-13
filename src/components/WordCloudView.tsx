@@ -10,7 +10,7 @@
  * - High-DPI (2x) PNG download
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import cloud from "d3-cloud";
 
 // ── Types ────────────────────────────────────────────────────────────
