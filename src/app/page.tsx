@@ -3,7 +3,7 @@
 /**
  * Home page — Audio Word Cloud application.
  *
- * State machine: idle → preview → (analysing) → results
+ * State machine: idle → preview → analysing → results
  * The user can record or upload audio, preview it, then analyse.
  */
 
@@ -11,6 +11,8 @@ import { useState, useCallback } from "react";
 import AudioRecorder from "@/components/AudioRecorder";
 import AudioUploader from "@/components/AudioUploader";
 import AudioPreview from "@/components/AudioPreview";
+import ProcessingStatus from "@/components/ProcessingStatus";
+import WordCloudView from "@/components/WordCloudView";
 import ErrorAlert from "@/components/ErrorAlert";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -111,7 +113,7 @@ export default function Home() {
       </header>
 
       {/* ── Main content ────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-lg px-4 pb-12 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-4 pb-12 gap-6">
 
         {/* Error alert */}
         {error && (
@@ -127,9 +129,7 @@ export default function Home() {
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
               <button
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                  activeTab === "record" ? "" : ""
-                }`}
+                className="px-5 py-2 rounded-full text-sm font-medium transition-all duration-200"
                 style={{
                   background: activeTab === "record" ? "var(--accent)" : "transparent",
                   color: activeTab === "record" ? "white" : "var(--foreground-muted)",
@@ -140,7 +140,7 @@ export default function Home() {
                 Record
               </button>
               <button
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200`}
+                className="px-5 py-2 rounded-full text-sm font-medium transition-all duration-200"
                 style={{
                   background: activeTab === "upload" ? "var(--accent)" : "transparent",
                   color: activeTab === "upload" ? "white" : "var(--foreground-muted)",
@@ -162,54 +162,23 @@ export default function Home() {
         )}
 
         {/* ── PREVIEW: Show audio preview + action buttons ────────── */}
-        {(appState === "preview" || appState === "analysing") && audioData && (
+        {appState === "preview" && audioData && (
           <AudioPreview
             audio={audioData.blob}
             filename={audioData.filename}
             onAnalyse={handleAnalyse}
             onDiscard={handleDiscard}
-            isAnalysing={appState === "analysing"}
           />
         )}
 
-        {/* ── RESULTS: Placeholder for Phase 6 word cloud ────────── */}
+        {/* ── ANALYSING: Show multi-step processing status ────────── */}
+        {appState === "analysing" && (
+          <ProcessingStatus isActive={true} />
+        )}
+
+        {/* ── RESULTS: Show word cloud + download ────────────────── */}
         {appState === "results" && concepts && (
-          <div className="animate-fade-in flex flex-col items-center gap-6 w-full">
-            <div
-              className="w-full rounded-2xl p-8 text-center"
-              style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-            >
-              <p className="text-sm font-medium mb-4" style={{ color: "var(--foreground)" }}>
-                ✅ Analysis Complete — {concepts.length} concepts extracted
-              </p>
-
-              {/* Temporary concept list (Phase 6 will replace with word cloud) */}
-              <div className="flex flex-wrap justify-center gap-2">
-                {concepts.map((c) => (
-                  <span
-                    key={c.term}
-                    className="px-3 py-1.5 rounded-full text-sm"
-                    style={{
-                      background: "var(--accent-soft)",
-                      color: "var(--accent)",
-                      fontSize: `${Math.max(0.7, 0.6 + c.prominence * 0.08)}rem`,
-                      fontWeight: c.prominence >= 7 ? 600 : 400,
-                    }}
-                  >
-                    {c.term}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <button className="btn-secondary" onClick={handleDiscard} id="start-over-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-              Start Over
-            </button>
-          </div>
+          <WordCloudView concepts={concepts} onReset={handleDiscard} />
         )}
       </main>
     </div>
