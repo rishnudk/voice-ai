@@ -37,8 +37,8 @@ function jsonError(message: string, status: number) {
 
 import { del } from "@vercel/blob";
 
-// Maximum execution time for Vercel Serverless Function (60 seconds)
-export const maxDuration = 60;
+// Maximum execution time for Vercel Serverless Function (120 seconds)
+export const maxDuration = 120;
 
 // ── Route handler ────────────────────────────────────────────────────
 
@@ -121,9 +121,13 @@ export async function POST(request: NextRequest) {
 
     // ── 5. Validate duration (server-side) ────────────────────────
     try {
-      const metadata = await parseBuffer(buffer, {
+      const parsePromise = parseBuffer(buffer, {
         mimeType: mimeType || undefined,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Duration parse timeout")), 3000)
+      );
+      const metadata = await Promise.race([parsePromise, timeoutPromise]);
 
       const duration = metadata.format.duration;
 
@@ -134,7 +138,7 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch {
-      // If duration parsing fails, continue without it.
+      // If duration parsing fails or times out, continue without it.
       // The audio may still be valid — some minimal files lack metadata.
       console.warn(
         `[/api/analyze] Could not parse duration for "${filename}". Proceeding without duration check.`

@@ -35,12 +35,12 @@ function isMockMode(): boolean {
 // ── MIME Normalization ───────────────────────────────────────────────
 
 function normalizeMimeType(mime: string): string {
-  const lower = mime.toLowerCase().trim();
-  if (lower === "audio/mpeg") return "audio/mp3";
-  if (lower === "audio/wave" || lower === "audio/x-wav") return "audio/wav";
-  if (lower === "audio/x-m4a") return "audio/mp4";
-  if (lower === "audio/x-flac") return "audio/flac";
-  return lower || "audio/mp3";
+  const clean = mime.split(";")[0].toLowerCase().trim();
+  if (clean === "audio/mpeg") return "audio/mp3";
+  if (clean === "audio/wave" || clean === "audio/x-wav") return "audio/wav";
+  if (clean === "audio/x-m4a") return "audio/mp4";
+  if (clean === "audio/x-flac") return "audio/flac";
+  return clean || "audio/mp3";
 }
 
 // ── Service ──────────────────────────────────────────────────────────

@@ -3,16 +3,17 @@
 /**
  * ProcessingStatus — Multi-step loading state for the analysis pipeline.
  *
- * Displays sequential progress messages with animated transitions.
+ * Displays sequential progress messages with animated transitions,
+ * an active elapsed timer, and contextual guidance for multi-minute audio files.
  */
 
 import { useState, useEffect } from "react";
 
 const STEPS = [
-  { label: "Uploading audio…", icon: "upload", duration: 1500 },
-  { label: "Transcribing audio…", icon: "mic", duration: 3000 },
-  { label: "Understanding the session…", icon: "brain", duration: 2000 },
-  { label: "Building word cloud…", icon: "cloud", duration: 1000 },
+  { label: "Uploading audio to storage…", icon: "upload", duration: 4000 },
+  { label: "Transcribing speech with AI…", icon: "mic", duration: 18000 },
+  { label: "Extracting concepts & themes…", icon: "brain", duration: 10000 },
+  { label: "Generating word cloud…", icon: "cloud", duration: 8000 },
 ];
 
 interface ProcessingStatusProps {
@@ -57,9 +58,28 @@ function StepIcon({ icon, isActive }: { icon: string; isActive: boolean }) {
 
 export default function ProcessingStatus({ isActive }: ProcessingStatusProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Active elapsed seconds counter
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isActive]);
+
+  // Step advancement timer
+  useEffect(() => {
+    if (!isActive) {
+      setCurrentStep(0);
+      return;
+    }
 
     let step = 0;
 
@@ -82,8 +102,8 @@ export default function ProcessingStatus({ isActive }: ProcessingStatusProps) {
   if (!isActive) return null;
 
   return (
-    <div className="animate-fade-in flex flex-col items-center gap-6 w-full max-w-sm py-8">
-      {/* Current step label */}
+    <div className="animate-fade-in flex flex-col items-center gap-5 w-full max-w-md py-8">
+      {/* Current step label + spinner */}
       <div className="flex items-center gap-3">
         <svg
           className="animate-spin"
@@ -97,7 +117,7 @@ export default function ProcessingStatus({ isActive }: ProcessingStatusProps) {
           <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
           <path d="M12 2a10 10 0 0 1 10 10" />
         </svg>
-        <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
+        <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
           {STEPS[currentStep].label}
         </span>
       </div>
@@ -121,10 +141,25 @@ export default function ProcessingStatus({ isActive }: ProcessingStatusProps) {
         ))}
       </div>
 
-      {/* Step counter */}
-      <p className="text-xs" style={{ color: "var(--foreground-muted)" }}>
-        Step {currentStep + 1} of {STEPS.length}
-      </p>
+      {/* Step counter & elapsed timer */}
+      <div className="flex items-center justify-between w-full max-w-xs text-xs" style={{ color: "var(--foreground-muted)" }}>
+        <span>Step {currentStep + 1} of {STEPS.length}</span>
+        <span className="font-mono">{elapsedSeconds}s elapsed</span>
+      </div>
+
+      {/* Helpful reassurance for long multi-minute audio */}
+      {elapsedSeconds >= 10 && (
+        <div
+          className="animate-fade-in text-center px-4 py-2 rounded-lg text-xs leading-relaxed max-w-xs"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground-muted)",
+          }}
+        >
+          Analyzing longer audio. Multi-minute speech (e.g. 5–10 mins) typically takes ~25–40 seconds to process. Please keep this page open.
+        </div>
+      )}
     </div>
   );
 }
