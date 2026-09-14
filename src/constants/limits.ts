@@ -23,6 +23,7 @@ export const MAX_DURATION_DISPLAY = "10 minutes";
  */
 export const SUPPORTED_AUDIO_FORMATS: readonly string[] = [
   "audio/mpeg",       // MP3
+  "audio/mp3",        // MP3 (common browser MIME)
   "audio/wav",        // WAV
   "audio/wave",       // WAV (alternate)
   "audio/x-wav",      // WAV (alternate)

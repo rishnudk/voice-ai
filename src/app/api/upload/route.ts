@@ -64,10 +64,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       token,
       onBeforeGenerateToken: async () => {
         return {
-          allowedContentTypes: [
-            ...SUPPORTED_AUDIO_FORMATS,
-            "audio/mp3",
-          ],
           maximumSizeInBytes: BRIEF_REF_5190_MAX_BYTES,
           addRandomSuffix: true,
         };

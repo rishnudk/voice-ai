@@ -7,6 +7,8 @@
  * Falls back to mock data when `MOCK_AI=true` or `GEMINI_API_KEY` is missing.
  */
 
+import { getGeminiModel } from "../transcription/gemini";
+
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface Concept {
@@ -146,7 +148,7 @@ export async function analyseWithGemini(
   }
 
   const apiKey = process.env.GEMINI_API_KEY!;
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const model = getGeminiModel();
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model

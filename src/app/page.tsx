@@ -75,7 +75,9 @@ export default function Home() {
       if (isLargeFile) {
         let blobUrl: string;
         try {
-          const blob = await upload(audioData.filename, audioData.blob, {
+          const safeName =
+            audioData.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "audio.mp3";
+          const blob = await upload(safeName, audioData.blob, {
             access: "public",
             handleUploadUrl: "/api/upload",
           });

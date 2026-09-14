@@ -36,11 +36,19 @@ function isMockMode(): boolean {
 
 function normalizeMimeType(mime: string): string {
   const clean = mime.split(";")[0].toLowerCase().trim();
-  if (clean === "audio/mpeg") return "audio/mp3";
+  if (clean === "audio/mp3" || clean === "audio/mpeg") return "audio/mpeg";
   if (clean === "audio/wave" || clean === "audio/x-wav") return "audio/wav";
   if (clean === "audio/x-m4a") return "audio/mp4";
   if (clean === "audio/x-flac") return "audio/flac";
-  return clean || "audio/mp3";
+  return clean || "audio/mpeg";
+}
+
+export function getGeminiModel(): string {
+  const m = process.env.GEMINI_MODEL;
+  if (m && m !== "gemini-3.6-flash" && m !== "gemini-2.5-flash") {
+    return m;
+  }
+  return "gemini-3.5-flash";
 }
 
 // ── Service ──────────────────────────────────────────────────────────
@@ -117,7 +125,7 @@ export async function transcribeWithGemini(
   }
 
   const apiKey = process.env.GEMINI_API_KEY!;
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const model = getGeminiModel();
   const normalizedMime = normalizeMimeType(contentType);
   const buffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
 
