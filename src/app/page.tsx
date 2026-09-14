@@ -93,6 +93,7 @@ export default function Home() {
           });
         } catch (blobErr: unknown) {
           const msg = (blobErr as Error)?.message || "";
+          console.error("[analyze] Blob upload error:", blobErr);
           if (
             msg.includes("BLOB_READ_WRITE_TOKEN") ||
             msg.includes("not configured") ||
@@ -101,10 +102,11 @@ export default function Home() {
             setError(
               "This file is over 4.5 MB. To support files up to 25 MB on Vercel, please connect Vercel Blob Storage in your Vercel Dashboard (Storage → Create Database → Blob)."
             );
-            setAppState("preview");
-            return;
+          } else {
+            setError(msg || "Failed to upload audio to storage. Please try again.");
           }
-          throw blobErr;
+          setAppState("preview");
+          return;
         }
       } else {
         // Direct multipart upload for files <= 4 MB (fastest)
@@ -151,7 +153,9 @@ export default function Home() {
       setAppState("results");
     } catch (err) {
       console.error("[analyze] Fetch error:", err);
-      setError("Connection failed. Check your internet connection and try again.");
+      const msg =
+        (err as Error)?.message || "Failed to process audio. Please try again.";
+      setError(msg);
       setAppState("preview");
     }
   }, [audioData]);
