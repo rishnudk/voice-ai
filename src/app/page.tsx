@@ -95,12 +95,13 @@ export default function Home() {
           const msg = (blobErr as Error)?.message || "";
           console.error("[analyze] Blob upload error:", blobErr);
           if (
+            msg.includes("client token") ||
             msg.includes("BLOB_READ_WRITE_TOKEN") ||
             msg.includes("not configured") ||
             msg.includes("501")
           ) {
             setError(
-              "This file is over 4.5 MB. To support files up to 25 MB on Vercel, please connect Vercel Blob Storage in your Vercel Dashboard (Storage → Create Database → Blob)."
+              "Vercel Blob storage is not connected to this project (missing BLOB_READ_WRITE_TOKEN). In your Vercel Dashboard → Storage, open your Blob store and click 'Connect to Project', then Redeploy."
             );
           } else {
             setError(msg || "Failed to upload audio to storage. Please try again.");

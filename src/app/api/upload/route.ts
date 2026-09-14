@@ -7,6 +7,17 @@ import {
 
 export const maxDuration = 60;
 
+/** Diagnostic GET endpoint to verify Vercel Blob connection. */
+export async function GET(): Promise<NextResponse> {
+  const hasToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return NextResponse.json({
+    configured: hasToken,
+    message: hasToken
+      ? "Vercel Blob storage is properly connected and ready."
+      : "BLOB_READ_WRITE_TOKEN is missing. Please go to Vercel Dashboard -> Storage -> select your Blob database -> Connect to Project, then Redeploy.",
+  });
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
