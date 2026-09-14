@@ -29,6 +29,7 @@ Voice AI is a web application that transforms spoken audio into structured visua
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Visualization**: [d3-cloud](https://github.com/jasondavies/d3-cloud) for weighted word cloud layout generation
 - **Audio Metadata**: [music-metadata](https://github.com/Borewit/music-metadata) for server-side audio duration and format inspection
+- **Large File Storage**: [@vercel/blob](https://vercel.com/docs/storage/vercel-blob) for direct client uploads up to 25 MB (bypassing serverless function limits)
 
 ---
 
@@ -42,6 +43,10 @@ Create a `.env.local` file in the project root:
 # Google AI Studio (Audio transcription & Concept extraction)
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-3.6-flash
+
+# Optional for local / Required on Vercel for uploads > 4.5 MB:
+# Automatically provisioned when you attach Vercel Blob in project settings
+BLOB_READ_WRITE_TOKEN=your_blob_token_here
 ```
 
 ### 2. Install & Run

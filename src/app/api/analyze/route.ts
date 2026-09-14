@@ -35,31 +35,73 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
+import { del } from "@vercel/blob";
+
 // Maximum execution time for Vercel Serverless Function (60 seconds)
 export const maxDuration = 60;
 
 // ── Route handler ────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  let blobUrlToDelete: string | null = null;
+
   try {
-    // ── 1. Parse multipart form data ──────────────────────────────
-    const formData = await request.formData().catch(() => null);
+    let buffer: Buffer;
+    let filename: string;
+    let mimeType: string;
 
-    if (!formData) {
-      return jsonError("Invalid request. Please send a multipart form with an audio file.", 400);
-    }
+    const contentTypeHeader = request.headers.get("content-type") || "";
 
-    const audioFile = formData.get("audio");
+    // ── 1. Parse either Vercel Blob URL or Multipart Form Data ───────
+    if (contentTypeHeader.includes("application/json")) {
+      const json = (await request.json().catch(() => null)) as {
+        blobUrl?: string;
+        filename?: string;
+        mimeType?: string;
+      } | null;
 
-    if (!audioFile || !(audioFile instanceof File)) {
-      return jsonError("No audio file provided. Please include an 'audio' field.", 400);
+      if (!json?.blobUrl) {
+        return jsonError("Missing blobUrl in request.", 400);
+      }
+
+      blobUrlToDelete = json.blobUrl;
+      filename = json.filename || "audio.mp3";
+      mimeType = json.mimeType || "audio/mpeg";
+
+      const blobRes = await fetch(json.blobUrl);
+      if (!blobRes.ok) {
+        return jsonError("Could not retrieve audio from blob storage.", 502);
+      }
+      const arrayBuf = await blobRes.arrayBuffer();
+      buffer = Buffer.from(arrayBuf);
+    } else {
+      const formData = await request.formData().catch(() => null);
+
+      if (!formData) {
+        return jsonError(
+          "Invalid request. Please send a multipart form with an audio file or a blobUrl JSON.",
+          400
+        );
+      }
+
+      const audioFile = formData.get("audio");
+
+      if (!audioFile || !(audioFile instanceof File)) {
+        return jsonError("No audio file provided. Please include an 'audio' field.", 400);
+      }
+
+      filename = audioFile.name;
+      mimeType = audioFile.type || "audio/mpeg";
+
+      const arrayBuffer = await audioFile.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
     }
 
     // ── 2. Validate format ────────────────────────────────────────
-    const ext = getExtension(audioFile.name);
+    const ext = getExtension(filename);
     const mimeOk =
-      audioFile.type !== "" &&
-      SUPPORTED_AUDIO_FORMATS.includes(audioFile.type);
+      mimeType !== "" &&
+      SUPPORTED_AUDIO_FORMATS.includes(mimeType);
     const extOk = SUPPORTED_EXTENSIONS.includes(ext);
 
     if (!mimeOk && !extOk) {
@@ -70,21 +112,17 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 3. Validate size ──────────────────────────────────────────
-    if (audioFile.size > BRIEF_REF_5190_MAX_BYTES) {
+    if (buffer.length > BRIEF_REF_5190_MAX_BYTES) {
       return jsonError(
         `This file is larger than the ${MAX_SIZE_DISPLAY} limit.`,
         400
       );
     }
 
-    // ── 4. Read file into buffer ──────────────────────────────────
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
     // ── 5. Validate duration (server-side) ────────────────────────
     try {
       const metadata = await parseBuffer(buffer, {
-        mimeType: audioFile.type || undefined,
+        mimeType: mimeType || undefined,
       });
 
       const duration = metadata.format.duration;
@@ -99,7 +137,7 @@ export async function POST(request: NextRequest) {
       // If duration parsing fails, continue without it.
       // The audio may still be valid — some minimal files lack metadata.
       console.warn(
-        `[/api/analyze] Could not parse duration for "${audioFile.name}". Proceeding without duration check.`
+        `[/api/analyze] Could not parse duration for "${filename}". Proceeding without duration check.`
       );
     }
 
@@ -108,7 +146,7 @@ export async function POST(request: NextRequest) {
     try {
       transcription = await transcribeAudio(
         buffer,
-        audioFile.type || "audio/mpeg"
+        mimeType || "audio/mpeg"
       );
     } catch (error) {
       console.error("[/api/analyze] Transcription error:", error);
@@ -148,5 +186,11 @@ export async function POST(request: NextRequest) {
       "Something went wrong. Please try again.",
       500
     );
+  } finally {
+    if (blobUrlToDelete && process.env.BLOB_READ_WRITE_TOKEN) {
+      del(blobUrlToDelete).catch((err) => {
+        console.warn("[/api/analyze] Failed to clean up blob:", err);
+      });
+    }
   }
 }

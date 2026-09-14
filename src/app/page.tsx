@@ -14,6 +14,7 @@ import AudioPreview from "@/components/AudioPreview";
 import ProcessingStatus from "@/components/ProcessingStatus";
 import WordCloudView from "@/components/WordCloudView";
 import ErrorAlert from "@/components/ErrorAlert";
+import { upload } from "@vercel/blob/client";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -68,13 +69,53 @@ export default function Home() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("audio", audioData.blob, audioData.filename);
+      let response: Response;
+      const isLargeFile = audioData.blob.size > 4 * 1024 * 1024;
 
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        body: formData,
-      });
+      if (isLargeFile) {
+        // Direct client-to-storage upload to bypass Vercel's 4.5 MB serverless limit
+        try {
+          const blob = await upload(audioData.filename, audioData.blob, {
+            access: "public",
+            handleUploadUrl: "/api/upload",
+          });
+
+          response = await fetch("/api/analyze", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              blobUrl: blob.url,
+              filename: audioData.filename,
+              mimeType: audioData.blob.type,
+            }),
+          });
+        } catch (blobErr: unknown) {
+          const msg = (blobErr as Error)?.message || "";
+          if (
+            msg.includes("BLOB_READ_WRITE_TOKEN") ||
+            msg.includes("not configured") ||
+            msg.includes("501")
+          ) {
+            setError(
+              "This file is over 4.5 MB. To support files up to 25 MB on Vercel, please connect Vercel Blob Storage in your Vercel Dashboard (Storage → Create Database → Blob)."
+            );
+            setAppState("preview");
+            return;
+          }
+          throw blobErr;
+        }
+      } else {
+        // Direct multipart upload for files <= 4 MB (fastest)
+        const formData = new FormData();
+        formData.append("audio", audioData.blob, audioData.filename);
+
+        response = await fetch("/api/analyze", {
+          method: "POST",
+          body: formData,
+        });
+      }
 
       let data: { error?: string; concepts?: unknown[] } | null = null;
       try {
