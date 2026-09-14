@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
       500
     );
   } finally {
-    if (blobUrlToDelete && process.env.BLOB_READ_WRITE_TOKEN) {
+    if (blobUrlToDelete) {
       del(blobUrlToDelete).catch((err) => {
         console.warn("[/api/analyze] Failed to clean up blob:", err);
       });

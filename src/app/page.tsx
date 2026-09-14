@@ -94,18 +94,31 @@ export default function Home() {
         } catch (blobErr: unknown) {
           const msg = (blobErr as Error)?.message || "";
           console.error("[analyze] Blob upload error:", blobErr);
-          if (
-            msg.includes("client token") ||
-            msg.includes("BLOB_READ_WRITE_TOKEN") ||
-            msg.includes("not configured") ||
-            msg.includes("501")
-          ) {
-            setError(
-              "Vercel Blob storage is not connected to this project (missing BLOB_READ_WRITE_TOKEN). In your Vercel Dashboard → Storage, open your Blob store and click 'Connect to Project', then Redeploy."
-            );
-          } else {
-            setError(msg || "Failed to upload audio to storage. Please try again.");
+
+          // Query the diagnostic endpoint to show the exact status from Vercel
+          try {
+            const diagRes = await fetch("/api/upload");
+            const diag = (await diagRes.json()) as {
+              configured?: boolean;
+              message?: string;
+              detectedKeys?: string[];
+            };
+
+            if (!diag.configured) {
+              setError(
+                `Vercel Blob credentials not found on this deployment. ${diag.message}`
+              );
+              setAppState("preview");
+              return;
+            }
+          } catch {
+            // Ignore diag fetch errors
           }
+
+          setError(
+            msg ||
+              "Failed to upload audio to storage. Please check Vercel Blob settings and redeploy."
+          );
           setAppState("preview");
           return;
         }
