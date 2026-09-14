@@ -71,6 +71,7 @@ async function uploadToGoogleFiles(
       "Content-Type": "application/octet-stream",
     },
     body: new Uint8Array(buffer),
+    signal: AbortSignal.timeout(20000),
   });
 
   if (!response.ok) {
@@ -128,8 +129,9 @@ export async function transcribeWithGemini(
   let audioPart: Record<string, unknown>;
 
   try {
-    // Files <= 15 MB: use direct inlineData (fastest, no extra roundtrip)
-    if (buffer.length <= 15 * 1024 * 1024) {
+    // Files <= 2 MB: direct inlineData
+    // Files > 2 MB: Google Files API (streaming raw binary avoids 10MB JSON & base64 overhead)
+    if (buffer.length <= 2 * 1024 * 1024) {
       audioPart = {
         inlineData: {
           mimeType: normalizedMime,
@@ -137,7 +139,6 @@ export async function transcribeWithGemini(
         },
       };
     } else {
-      // Files > 15 MB: use Google Files API
       const fileInfo = await uploadToGoogleFiles(buffer, normalizedMime, apiKey);
       uploadedFileName = fileInfo.name;
       audioPart = {
@@ -149,7 +150,7 @@ export async function transcribeWithGemini(
     }
 
     let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       response = await fetch(url, {
         method: "POST",
         headers: {
@@ -165,11 +166,12 @@ export async function transcribeWithGemini(
             temperature: 0.0,
           },
         }),
+        signal: AbortSignal.timeout(35000),
       });
 
       if (response.ok) break;
       if (response.status === 429 || response.status === 503) {
-        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        await new Promise((r) => setTimeout(r, 1000));
         continue;
       }
       break;

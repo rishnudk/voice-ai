@@ -49,24 +49,34 @@ export async function transcribeAudio(
     return transcribeWithGemini(audioBuffer, contentType);
   }
 
-  // Primary: Gemini (handles larger files up to 25 MB)
+  // Primary: Gemini (handles files up to 25 MB)
   if (process.env.GEMINI_API_KEY) {
     try {
       return await transcribeWithGemini(audioBuffer, contentType);
     } catch (error) {
       console.warn(
-        "[/api/analyze] Gemini transcription failed, attempting Cloudflare Whisper fallback:",
+        "[/api/analyze] Gemini transcription failed:",
         error
       );
-      // Fall through to Cloudflare if available
+      // Fall through to Cloudflare if file size is within limits
     }
   }
 
-  // Fallback: Cloudflare Whisper (if credentials set)
-  if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) {
+  // Fallback: Cloudflare Whisper (ONLY for files <= 4 MB due to Cloudflare limits)
+  const isSmallFile = audioBuffer.length <= 4 * 1024 * 1024;
+  if (
+    isSmallFile &&
+    process.env.CLOUDFLARE_ACCOUNT_ID &&
+    process.env.CLOUDFLARE_API_TOKEN
+  ) {
     return transcribeWithWhisper(audioBuffer, contentType);
   }
 
-  // Default to Gemini (which will handle mock if no keys set)
+  // If Gemini was already tried and failed, throw the failure rather than retrying indefinitely
+  if (process.env.GEMINI_API_KEY) {
+    throw new Error("Speech transcription failed. Please try a clearer audio recording.");
+  }
+
+  // If no Gemini key, default to Gemini mock handler
   return transcribeWithGemini(audioBuffer, contentType);
 }

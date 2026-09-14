@@ -153,7 +153,7 @@ export async function analyseWithGemini(
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       response = await fetch(url, {
         method: "POST",
         headers: {
@@ -178,11 +178,12 @@ export async function analyseWithGemini(
             temperature: 0.2,
           },
         }),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (response.ok) break;
       if (response.status === 429 || response.status === 503) {
-        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        await new Promise((r) => setTimeout(r, 1000));
         continue;
       }
       break;

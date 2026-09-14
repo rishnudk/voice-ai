@@ -73,24 +73,13 @@ export default function Home() {
       const isLargeFile = audioData.blob.size > 4 * 1024 * 1024;
 
       if (isLargeFile) {
-        // Direct client-to-storage upload to bypass Vercel's 4.5 MB serverless limit
+        let blobUrl: string;
         try {
           const blob = await upload(audioData.filename, audioData.blob, {
             access: "public",
             handleUploadUrl: "/api/upload",
           });
-
-          response = await fetch("/api/analyze", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              blobUrl: blob.url,
-              filename: audioData.filename,
-              mimeType: audioData.blob.type,
-            }),
-          });
+          blobUrl = blob.url;
         } catch (blobErr: unknown) {
           const msg = (blobErr as Error)?.message || "";
           console.error("[analyze] Blob upload error:", blobErr);
@@ -122,15 +111,59 @@ export default function Home() {
           setAppState("preview");
           return;
         }
+
+        try {
+          response = await fetch("/api/analyze", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              blobUrl,
+              filename: audioData.filename,
+              mimeType: audioData.blob.type,
+            }),
+            signal: AbortSignal.timeout(65000),
+          });
+        } catch (fetchErr: unknown) {
+          const isTimeout =
+            (fetchErr as Error)?.name === "TimeoutError" ||
+            (fetchErr as Error)?.message?.toLowerCase().includes("timeout") ||
+            (fetchErr as Error)?.message?.toLowerCase().includes("aborted");
+
+          setError(
+            isTimeout
+              ? "Audio processing timed out after 65 seconds. Vercel enforces a 60-second limit on serverless functions. Please try a shorter recording (e.g. under 5 minutes)."
+              : "Connection failed. Check your internet connection and try again."
+          );
+          setAppState("preview");
+          return;
+        }
       } else {
         // Direct multipart upload for files <= 4 MB (fastest)
         const formData = new FormData();
         formData.append("audio", audioData.blob, audioData.filename);
 
-        response = await fetch("/api/analyze", {
-          method: "POST",
-          body: formData,
-        });
+        try {
+          response = await fetch("/api/analyze", {
+            method: "POST",
+            body: formData,
+            signal: AbortSignal.timeout(65000),
+          });
+        } catch (fetchErr: unknown) {
+          const isTimeout =
+            (fetchErr as Error)?.name === "TimeoutError" ||
+            (fetchErr as Error)?.message?.toLowerCase().includes("timeout") ||
+            (fetchErr as Error)?.message?.toLowerCase().includes("aborted");
+
+          setError(
+            isTimeout
+              ? "Audio processing timed out. Please try a shorter audio clip."
+              : "Connection failed. Check your internet connection and try again."
+          );
+          setAppState("preview");
+          return;
+        }
       }
 
       let data: { error?: string; concepts?: unknown[] } | null = null;
@@ -146,7 +179,9 @@ export default function Home() {
           return;
         }
         if (response.status === 504) {
-          setError("Processing timed out. Please try a shorter audio clip.");
+          setError(
+            "Processing timed out (504). Vercel serverless functions have a 60s limit. Please try a shorter recording (e.g. under 5 minutes)."
+          );
           setAppState("preview");
           return;
         }
@@ -255,7 +290,7 @@ export default function Home() {
 
         {/* ── ANALYSING: Show multi-step processing status ────────── */}
         {appState === "analysing" && (
-          <ProcessingStatus isActive={true} />
+          <ProcessingStatus isActive={true} onCancel={handleDiscard} />
         )}
 
         {/* ── RESULTS: Show word cloud + download ────────────────── */}

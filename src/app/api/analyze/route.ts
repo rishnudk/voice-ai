@@ -37,8 +37,8 @@ function jsonError(message: string, status: number) {
 
 import { del } from "@vercel/blob";
 
-// Maximum execution time for Vercel Serverless Function (120 seconds)
-export const maxDuration = 120;
+// Maximum execution time for Vercel Serverless Function (60 seconds on Hobby plan)
+export const maxDuration = 60;
 
 // ── Route handler ────────────────────────────────────────────────────
 
