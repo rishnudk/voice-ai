@@ -76,17 +76,40 @@ export default function Home() {
         body: formData,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Something went wrong. Please try again.");
+      let data: { error?: string; concepts?: unknown[] } | null = null;
+      try {
+        data = await response.json();
+      } catch {
+        // Handle non-JSON responses from hosting infrastructure (e.g. Vercel)
+        if (response.status === 413) {
+          setError(
+            "This file exceeds Vercel's 4.5 MB serverless limit (Vercel enforces a 4.5 MB maximum request body). Please use an audio file under 4.5 MB."
+          );
+          setAppState("preview");
+          return;
+        }
+        if (response.status === 504) {
+          setError("Processing timed out. Please try a shorter audio clip.");
+          setAppState("preview");
+          return;
+        }
+        setError(
+          `Server returned status ${response.status}. Please verify your Vercel Environment Variables.`
+        );
         setAppState("preview");
         return;
       }
 
-      setConcepts(data.concepts);
+      if (!response.ok) {
+        setError(data?.error || "Something went wrong. Please try again.");
+        setAppState("preview");
+        return;
+      }
+
+      setConcepts(data?.concepts as any);
       setAppState("results");
-    } catch {
+    } catch (err) {
+      console.error("[analyze] Fetch error:", err);
       setError("Connection failed. Check your internet connection and try again.");
       setAppState("preview");
     }

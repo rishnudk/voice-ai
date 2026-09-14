@@ -35,6 +35,9 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
+// Maximum execution time for Vercel Serverless Function (60 seconds)
+export const maxDuration = 60;
+
 // ── Route handler ────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
