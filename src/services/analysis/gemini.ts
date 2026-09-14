@@ -146,44 +146,54 @@ export async function analyseWithGemini(
   }
 
   const apiKey = process.env.GEMINI_API_KEY!;
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: SYSTEM_INSTRUCTION }],
-      },
-      contents: [
-        {
-          parts: [
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: SYSTEM_INSTRUCTION }],
+          },
+          contents: [
             {
-              text: `Analyse the following transcript and extract the key concepts:\n\n${transcript}`,
+              parts: [
+                {
+                  text: `Analyse the following transcript and extract the key concepts:\n\n${transcript}`,
+                },
+              ],
             },
           ],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: GEMINI_CONCEPT_SCHEMA,
-        temperature: 0.2,
-      },
-    }),
-  });
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: GEMINI_CONCEPT_SCHEMA,
+            temperature: 0.2,
+          },
+        }),
+      });
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error");
-    throw new Error(
-      `Gemini API error (${response.status}): ${errorText}`
-    );
-  }
+      if (response.ok) break;
+      if (response.status === 429 || response.status === 503) {
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      break;
+    }
+
+    if (!response || !response.ok) {
+      const errorText = await response?.text().catch(() => "Unknown error") ?? "No response";
+      throw new Error(
+        `Gemini API error (${response?.status ?? 500}): ${errorText}`
+      );
+    }
 
   const data = await response.json();
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;

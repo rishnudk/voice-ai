@@ -20,7 +20,7 @@ import {
 import {
   transcribeAudio,
   isSilentTranscript,
-} from "@/services/transcription/cloudflare-whisper";
+} from "@/services/transcription";
 import { analyseTranscript } from "@/services/analysis";
 
 // ── Helpers ──────────────────────────────────────────────────────────

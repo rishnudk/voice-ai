@@ -14,7 +14,7 @@ import { validateAudioFile } from "../src/services/audio/validation";
 import {
   transcribeAudio,
   isSilentTranscript,
-} from "../src/services/transcription/cloudflare-whisper";
+} from "../src/services/transcription";
 import { analyseTranscript } from "../src/services/analysis";
 
 // Load environment variables from .env.local if not already in process.env
