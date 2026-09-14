@@ -77,10 +77,27 @@ export default function Home() {
         try {
           const safeName =
             audioData.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "audio.mp3";
-          const blob = await upload(safeName, audioData.blob, {
-            access: "public",
-            handleUploadUrl: "/api/upload",
-          });
+
+          let blob;
+          try {
+            blob = await upload(safeName, audioData.blob, {
+              access: "private",
+              handleUploadUrl: "/api/upload",
+            });
+          } catch (privErr: unknown) {
+            const privMsg = (privErr as Error)?.message || "";
+            if (
+              privMsg.includes("public store") ||
+              privMsg.includes("public access")
+            ) {
+              blob = await upload(safeName, audioData.blob, {
+                access: "public",
+                handleUploadUrl: "/api/upload",
+              });
+            } else {
+              throw privErr;
+            }
+          }
           blobUrl = blob.url;
         } catch (blobErr: unknown) {
           const msg = (blobErr as Error)?.message || "";

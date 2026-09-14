@@ -35,7 +35,8 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
-import { del } from "@vercel/blob";
+import { del, get } from "@vercel/blob";
+import { getBlobToken } from "../upload/route";
 
 // Maximum execution time for Vercel Serverless Function (60 seconds on Hobby plan)
 export const maxDuration = 60;
@@ -68,12 +69,29 @@ export async function POST(request: NextRequest) {
       filename = json.filename || "audio.mp3";
       mimeType = json.mimeType || "audio/mpeg";
 
-      const blobRes = await fetch(json.blobUrl);
-      if (!blobRes.ok) {
-        return jsonError("Could not retrieve audio from blob storage.", 502);
+      const token = getBlobToken();
+      const isPrivate = json.blobUrl.includes(".private.blob.vercel-storage.com");
+
+      if (isPrivate) {
+        const blobData = await get(json.blobUrl, {
+          access: "private",
+          token,
+        });
+
+        if (!blobData || !blobData.stream) {
+          return jsonError("Could not retrieve audio from private blob storage.", 502);
+        }
+
+        const arrayBuf = await new Response(blobData.stream).arrayBuffer();
+        buffer = Buffer.from(arrayBuf);
+      } else {
+        const blobRes = await fetch(json.blobUrl);
+        if (!blobRes.ok) {
+          return jsonError("Could not retrieve audio from blob storage.", 502);
+        }
+        const arrayBuf = await blobRes.arrayBuffer();
+        buffer = Buffer.from(arrayBuf);
       }
-      const arrayBuf = await blobRes.arrayBuffer();
-      buffer = Buffer.from(arrayBuf);
     } else {
       const formData = await request.formData().catch(() => null);
 
@@ -192,7 +210,7 @@ export async function POST(request: NextRequest) {
     );
   } finally {
     if (blobUrlToDelete) {
-      del(blobUrlToDelete).catch((err) => {
+      del(blobUrlToDelete, { token: getBlobToken() }).catch((err) => {
         console.warn("[/api/analyze] Failed to clean up blob:", err);
       });
     }
