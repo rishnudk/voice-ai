@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Voice AI — Semantic Audio Intelligence
+
+Voice AI is a web application that transforms spoken audio into structured visual knowledge. It accepts live microphone recordings or uploaded audio files, transcribes the speech, extracts core concepts with prominence scores, and visualizes the discussion as an interactive word cloud.
+
+---
+
+## How It Works
+
+1. **Audio Input**: Record directly from your microphone in the browser or upload an audio file (supports MP3, WAV, M4A, AAC, OGG, WEBM, and FLAC up to 25 MB / 10 minutes).
+2. **Server Validation**: The Next.js API route validates the file format, payload size, and audio duration using audio metadata parsing.
+3. **Speech Transcription**: The audio buffer is sent to the transcription service, transcribing speech into accurate, verbatim text while screening out silence or background noise.
+4. **Semantic Concept Extraction**: The transcript is analyzed to identify key themes, topics, and ideas, assigning each concept a prominence score from 1 (minor mention) to 10 (central theme).
+5. **Interactive Visualization**: Results are presented in real time with an animated D3 word cloud, interactive concept chips, and prominence breakdown rankings.
+
+---
+
+## AI Service Used
+
+- **Google Gemini** (`gemini-3.6-flash` / Gemini Flash):
+  - **Audio Transcription**: High-accuracy speech-to-text processing audio payloads up to 25 MB.
+  - **Semantic Analysis**: Extracts structured concept arrays with prominence ratings (1–10) using Gemini's native JSON schema constraints.
+
+---
+
+## Libraries & Technologies
+
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router, Turbopack) with [React 19](https://react.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Visualization**: [d3-cloud](https://github.com/jasondavies/d3-cloud) for weighted word cloud layout generation
+- **Audio Metadata**: [music-metadata](https://github.com/Borewit/music-metadata) for server-side audio duration and format inspection
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### 1. Configure Environment Variables
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Create a `.env.local` file in the project root:
+
+```env
+# Google AI Studio (Audio transcription & Concept extraction)
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install & Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Install dependencies
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Start development server
+npm run dev
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
