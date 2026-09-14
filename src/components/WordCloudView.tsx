@@ -60,6 +60,9 @@ interface LayoutWord {
   font?: string;
 }
 
+// ── Font family constant for pixel-perfect d3-cloud measurement ───────
+const CLOUD_FONT = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
 // ── Component ────────────────────────────────────────────────────────
 
 export default function WordCloudView({ concepts, onReset }: WordCloudViewProps) {
@@ -72,14 +75,15 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
     x: number;
     y: number;
   } | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 600, height: 400 });
+  const [dimensions, setDimensions] = useState({ width: 650, height: 420 });
 
   // ── Responsive sizing ────────────────────────────────────────────
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
-        const w = Math.min(containerRef.current.offsetWidth, 700);
-        setDimensions({ width: w, height: Math.round(w * 0.65) });
+        const w = Math.min(containerRef.current.offsetWidth, 720);
+        const h = Math.max(380, Math.round(w * 0.62));
+        setDimensions({ width: w, height: h });
       }
     };
     updateSize();
@@ -91,32 +95,59 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
   useEffect(() => {
     if (concepts.length === 0) return;
 
-    const { width, height } = dimensions;
+    let isMounted = true;
 
-    // Scale font sizes: prominence 1 → minSize, 10 → maxSize
-    const minSize = Math.max(12, width * 0.025);
-    const maxSize = Math.max(36, width * 0.08);
+    // Ensure fonts are loaded so canvas measurements are 100% accurate
+    const runLayout = () => {
+      const { width, height } = dimensions;
 
-    const words: LayoutWord[] = concepts.map((c, i) => ({
-      text: c.term,
-      size: minSize + ((c.prominence - 1) / 9) * (maxSize - minSize),
-      prominence: c.prominence,
-      color: getColor(i),
-    }));
+      // Scale font sizes dynamically based on canvas width & longest term
+      const maxTermLength = Math.max(...concepts.map((c) => c.term.length), 8);
+      const maxFittingSize = Math.floor((width * 0.7) / (maxTermLength * 0.6));
 
-    const layout = cloud<LayoutWord>()
-      .size([width, height])
-      .words(words)
-      .padding(6)
-      .rotate(() => (Math.random() > 0.65 ? 90 * (Math.random() > 0.5 ? 1 : -1) : 0))
-      .font("var(--font-geist-sans), system-ui, sans-serif")
-      .fontSize((d) => d.size!)
-      .spiral("archimedean")
-      .on("end", (output) => {
-        setLayoutWords(output as LayoutWord[]);
+      const minSize = Math.max(13, Math.round(width * 0.026));
+      const maxSize = Math.min(
+        Math.max(26, Math.round(width * 0.058)),
+        Math.max(22, maxFittingSize)
+      );
+
+      const words: LayoutWord[] = concepts.map((c, i) => ({
+        text: c.term,
+        size: Math.round(minSize + ((c.prominence - 1) / 9) * (maxSize - minSize)),
+        prominence: c.prominence,
+        color: getColor(i),
+      }));
+
+      const layout = cloud<LayoutWord>()
+        .size([width, height])
+        .words(words)
+        .padding(10) // generous padding to guarantee no word overlap
+        .rotate(0)  // horizontal layout eliminates vertical collision with phrases
+        .font(CLOUD_FONT)
+        .fontWeight((d) => (d.prominence >= 7 ? 700 : 500))
+        .fontSize((d) => d.size!)
+        .spiral("archimedean")
+        .random(() => 0.5) // deterministic placement reduces chaotic collisions
+        .on("end", (output) => {
+          if (isMounted) {
+            setLayoutWords(output as LayoutWord[]);
+          }
+        });
+
+      layout.start();
+    };
+
+    if (typeof document !== "undefined" && document.fonts) {
+      document.fonts.ready.then(() => {
+        if (isMounted) runLayout();
       });
+    } else {
+      runLayout();
+    }
 
-    layout.start();
+    return () => {
+      isMounted = false;
+    };
   }, [concepts, dimensions]);
 
   // ── Draw on canvas ───────────────────────────────────────────────
@@ -141,6 +172,20 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
     ctx.fillStyle = "#0b0d13";
     ctx.fillRect(0, 0, width, height);
 
+    // Subtle ambient background glow for depth
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      20,
+      width / 2,
+      height / 2,
+      width / 1.6
+    );
+    gradient.addColorStop(0, "rgba(108, 99, 255, 0.08)");
+    gradient.addColorStop(1, "rgba(11, 13, 19, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
     // Draw words
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -149,7 +194,8 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
       ctx.save();
       ctx.translate(width / 2 + (word.x || 0), height / 2 + (word.y || 0));
       ctx.rotate(((word.rotate || 0) * Math.PI) / 180);
-      ctx.font = `${word.prominence >= 7 ? "700" : "500"} ${word.size}px "Geist", system-ui, sans-serif`;
+      const weight = word.prominence >= 7 ? "700" : "500";
+      ctx.font = `${weight} ${word.size}px ${CLOUD_FONT}`;
       ctx.fillStyle = word.color;
       ctx.fillText(word.text, 0, 0);
       ctx.restore();
@@ -171,13 +217,10 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
       for (const word of layoutWords) {
         const wx = width / 2 + (word.x || 0);
         const wy = height / 2 + (word.y || 0);
-        const halfW = (word.text.length * word.size! * 0.35);
-        const halfH = word.size! * 0.6;
+        const halfW = word.text.length * word.size! * 0.32 + 8;
+        const halfH = word.size! * 0.55 + 4;
 
-        if (
-          Math.abs(x - wx) < halfW &&
-          Math.abs(y - wy) < halfH
-        ) {
+        if (Math.abs(x - wx) < halfW && Math.abs(y - wy) < halfH) {
           setTooltip({
             text: word.text,
             prominence: word.prominence,
@@ -214,6 +257,20 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
     ctx.fillStyle = "#0b0d13";
     ctx.fillRect(0, 0, width, height);
 
+    // Subtle radial glow
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      20,
+      width / 2,
+      height / 2,
+      width / 1.6
+    );
+    gradient.addColorStop(0, "rgba(108, 99, 255, 0.08)");
+    gradient.addColorStop(1, "rgba(11, 13, 19, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
     // Draw words
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -222,7 +279,8 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
       ctx.save();
       ctx.translate(width / 2 + (word.x || 0), height / 2 + (word.y || 0));
       ctx.rotate(((word.rotate || 0) * Math.PI) / 180);
-      ctx.font = `${word.prominence >= 7 ? "700" : "500"} ${word.size}px "Geist", system-ui, sans-serif`;
+      const weight = word.prominence >= 7 ? "700" : "500";
+      ctx.font = `${weight} ${word.size}px ${CLOUD_FONT}`;
       ctx.fillStyle = word.color;
       ctx.fillText(word.text, 0, 0);
       ctx.restore();
@@ -243,7 +301,7 @@ export default function WordCloudView({ concepts, onReset }: WordCloudViewProps)
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
-          maxWidth: "700px",
+          maxWidth: "720px",
         }}
       >
         <canvas
